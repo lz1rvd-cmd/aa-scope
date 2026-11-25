@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AA Scope</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --ink:#1d2330; --muted:#677084; --line:#d9dde5;
+  --grid:#e7eaf0; --accent:#1f6feb; --swr:#1f6feb; --r:#d1242f; --x:#1a7f37; --z:#8250df;
+  --ref:#9aa3b2; --ok:#1a7f37; --bad:#d1242f; --warn:#9a6700; --cursor:#f0883e;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f1218; --panel:#171b23; --ink:#e6e9ef; --muted:#97a0b0; --line:#2a303c;
+    --grid:#232935; --accent:#4c8dff; --swr:#4c8dff; --r:#ff6b6b; --x:#3fb950; --z:#b38cff;
+    --ref:#6b7485; --ok:#3fb950; --bad:#ff6b6b; --warn:#d29922; --cursor:#f0883e; color-scheme:dark; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1400px;margin:0 auto;padding:14px 16px 30px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font-size:18px;margin:0;font-weight:650}
+.pill{padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-size:13px}
+.pill.ok{border-color:var(--ok);color:var(--ok)} .pill.bad{border-color:var(--bad);color:var(--bad)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+input[type=number]{width:120px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-size:14px}
+button{padding:7px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font-size:14px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.bands{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.bands button{padding:4px 9px;font-size:13px}
+.chk{flex-direction:row;align-items:center;gap:6px;color:var(--ink);font-size:14px}
+.progress{height:6px;background:var(--grid);border-radius:4px;overflow:hidden;margin-top:10px}
+.progress>div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.msg{margin-top:8px;font-size:13px;min-height:18px}
+.msg.err{color:var(--bad)}
+.grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;margin-top:12px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.tabs button{padding:5px 10px;font-size:13px}
+.tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+canvas{width:100%;display:block}
+#main{height:380px} #smith{aspect-ratio:1/1;height:auto}
+.readout{font-variant-numeric:tabular-nums;margin-top:8px;font-size:13px;color:var(--muted);min-height:20px}
+.readout b{color:var(--ink);font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat .k{font-size:12px;color:var(--muted)} .stat .v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums}
+.stat .s{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
+.tablewrap{overflow-x:auto;max-height:340px;overflow-y:auto;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13px}
+th,td{padding:4px 8px;text-align:right;border-bottom:1px solid var(--grid)}
+th{position:sticky;top:0;background:var(--panel)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>AA Scope · EU1KY</h1>
+  <span id="conn" class="pill">връзка: проверява се…</span>
+  <button id="btnVer">Провери връзката</button>
+  <span style="flex:1"></span>
+  <button id="btnQuit">Спри програмата</button>
+</header>
+
+<div class="panel">
+  <div class="controls">
+    <label>Начало, MHz<input id="fStart" type="number" step="0.001" min="0.1" max="1450" value="14.000"></label>
+    <label>Край, MHz<input id="fStop" type="number" step="0.001" min="0.1" max="1450" value="14.350"></label>
+    <label>Точки<input id="nPts" type="number" step="1" min="2" max="1001" value="101"></label>
+    <label>Z0, Ω<input id="z0" type="number" step="1" min="1" value="50"></label>
+    <button id="btnRun" class="primary">Измери</button>
+    <label class="chk"><input id="cont" type="checkbox"> Непрекъснато</label>
+    <button id="btnRef">Запомни за сравнение</button>
+    <button id="btnRefClr">Изчисти сравнението</button>
+    <button id="btnS1p">Запиши .s1p</button>
+    <button id="btnCsv">Запиши .csv</button>
+  </div>
+  <div class="bands" id="bands"></div>
+  <div class="progress"><div id="bar"></div></div>
+  <div id="msg" class="msg"></div>
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <div class="tabs" id="tabs">
+      <button data-v="swr" class="on">КСВ</button>
+      <button data-v="rx">R и X</button>
+      <button data-v="z">|Z|</button>
+      <button data-v="rl">Return loss</button>
+      <span style="flex:1"></span>
+      <label class="chk" style="font-size:13px">Мащаб КСВ
+        <select id="swrMax"><option value="0">авто</option><option>1.5</option><option>2</option><option>3</option><option>5</option><option>10</option></select>
+      </label>
+    </div>
+    <canvas id="main"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="readout" id="readout">Посочи графиката с мишката, за да видиш стойностите.</div>
+  </div>
+  <div class="panel">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Диаграма на Смит (Z0)</div>
+    <canvas id="smith"></canvas>
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<details>
+  <summary>Таблица с всички точки</summary>
+  <div class="tablewrap"><table id="tbl"></table></div>
+</details>
+</div>
+
+<script>
+"use strict";
+const BANDS = [
+  ["160 m",1.810,2.000],["80 m",3.500,3.800],["60 m",5.351,5.367],["40 m",7.000,7.200],
+  ["30 m",10.100,10.150],["20 m",14.000,14.350],["17 m",18.068,18.168],["15 m",21.000,21.450],
+  ["12 m",24.890,24.990],["10 m",28.000,29.700],["6 m",50.000,52.000],["2 m",144.000,146.000],
+  ["70 cm",430.000,440.000],["23 cm",1240.000,1300.000],["1–30 MHz",1.000,30.000]
+];
+const $ = id => document.getElementById(id);
+let data = [];        // [{f,r,x}]
+let ref = null;       // запомнено измерване
+let view = "swr";
+let cursor = -1;
+let running = false;
+let pollTimer = null;
+
+// ---------- изчисления ----------
+function z0(){ const v = parseFloat($("z0").value); return v > 0 ? v : 50; }
+function gamma(r, x, Z0){ // (Z-Z0)/(Z+Z0)
+  const nr = r - Z0, ni = x, dr = r + Z0, di = x, d = dr*dr + di*di;
+  return d ? [(nr*dr + ni*di)/d, (ni*dr - nr*di)/d] : [1,0];
+}
+function derive(p, Z0){
+  const g = gamma(p.r, p.x, Z0), m = Math.min(Math.hypot(g[0], g[1]), 0.999999);
+  return { g, mag:m, swr:(1+m)/(1-m), rl: m > 0 ? -20*Math.log10(m) : 99, zabs:Math.hypot(p.r, p.x) };
+}
+function fmtSwr(v, d){ return v > 99 ? "> 99" : v.toFixed(d === undefined ? 2 : d); }
+function fmtF(hz){ return (hz/1e6).toFixed(hz >= 1e8 ? 3 : 4) + " MHz"; }
+function lc(p){
+  const w = 2*Math.PI*p.f;
+  if (Math.abs(p.x) < 0.05) return "≈ чисто активно";
+  if (p.x > 0){ const L = p.x / w; return "L = " + (L < 1e-6 ? (L*1e9).toFixed(1)+" nH" : (L*1e6).toFixed(3)+" µH"); }
+  const C = 1 / (w * -p.x); return "C = " + (C < 1e-9 ? (C*1e12).toFixed(2)+" pF" : (C*1e9).toFixed(3)+" nF");
+}
+
+// ---------- платно ----------
+function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function prep(cv){
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  const c = cv.getContext("2d"); c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,w,h);
+  return {c, w, h};
+}
+function niceTicks(lo, hi, n){
+  const span = hi - lo || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1,2,2.5,5,10].map(k => k*mag).find(s => span/s <= n) || 10*mag;
+  const out = []; for (let v = Math.ceil(lo/step)*step; v <= hi + step*1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+const PAD = {l:58, r:14, t:12, b:34};
+function drawMain(){
+  const cv = $("main"), {c, w, h} = prep(cv), Z0 = z0();
+  const pw = w - PAD.l - PAD.r, ph = h - PAD.t - PAD.b;
+  const all = data.length ? data : (ref || []);
+  if (!all.length){
+    c.fillStyle = css("--muted"); c.font = "14px sans-serif"; c.textAlign = "center";
+    c.fillText("Няма измерване. Избери обхват и натисни „Измери“.", w/2, h/2); $("legend").innerHTML = ""; return;
+  }
+  const f0 = Math.min(...all.map(p => p.f)), f1 = Math.max(...all.map(p => p.f));
+  const series = [];
+  const mk = (arr, key, color, label, dash) => arr && arr.length && series.push({pts: arr.map(p => [p.f, key(p)]), color, label, dash});
+  if (view === "swr"){
+    mk(ref, p => derive(p,Z0).swr, css("--ref"), "сравнение", [5,4]);
+    mk(data, p => derive(p,Z0).swr, css("--swr"), "КСВ");
+  } else if (view === "rx"){
+    mk(ref, p => p.r, css("--ref"), "R (сравн.)", [5,4]); mk(ref, p => p.x, css("--ref"), "X (сравн.)", [2,3]);
+    mk(data, p => p.r, css("--r"), "R, Ω"); mk(data, p => p.x, css("--x"), "X, Ω");
+  } else if (view === "z"){
+    mk(ref, p => derive(p,Z0).zabs, css("--ref"), "сравнение", [5,4]);
+    mk(data, p => derive(p,Z0).zabs, css("--z"), "|Z|, Ω");
+  } else {
+    mk(ref, p => derive(p,Z0).rl, css("--ref"), "сравнение", [5,4]);
+    mk(data, p => derive(p,Z0).rl, css("--swr"), "Return loss, dB");
+  }
+  let ys = series.flatMap(s => s.pts.map(q => q[1])).filter(Number.isFinite);
+  let y0, y1;
+  if (view === "swr"){
+    const sel = parseFloat($("swrMax").value);
+    y0 = 1; y1 = sel > 0 ? sel : Math.min(10, Math.max(1.5, Math.ceil(Math.max(...ys)*2)/2));
+  } else if (view === "rl"){ y0 = 0; y1 = Math.min(60, Math.max(10, Math.ceil(Math.max(...ys)/5)*5)); }
+  else { y0 = Math.min(0, ...ys); y1 = Math.max(...ys); const m = (y1-y0)*0.08 || 1; y0 -= (y0<0?m:0); y1 += m; }
+  const X = f => PAD.l + (f1 > f0 ? (f - f0)/(f1 - f0) : 0.5) * pw;
+  const Y = v => PAD.t + (1 - (Math.min(Math.max(v,y0),y1) - y0)/(y1 - y0)) * ph;
+  // мрежа
+  c.strokeStyle = css("--grid"); c.lineWidth = 1; c.fillStyle = css("--muted"); c.font = "11px sans-serif";
+  c.textAlign = "right"; c.textBaseline = "middle";
+  for (const v of niceTicks(y0, y1, 6)){ const y = Y(v); c.beginPath(); c.moveTo(PAD.l, y); c.lineTo(w-PAD.r, y); c.stroke(); c.fillText(+v.toFixed(3)+"", PAD.l-6, y); }
+  c.textAlign = "center"; c.textBaseline = "top";
+  for (const v of niceTicks(f0/1e6, f1/1e6, 7)){ const x = X(v*1e6); c.beginPath(); c.moveTo(x, PAD.t); c.lineTo(x, h-PAD.b); c.stroke(); c.fillText(+v.toFixed(4)+"", x, h-PAD.b+6); }
+  c.fillText("MHz", w-PAD.r-12, h-14);
+  if (view === "swr") for (const lim of [1.5, 2]) if (lim < y1){ c.strokeStyle = css("--warn"); c.setLineDash([3,4]); const y = Y(lim); c.beginPath(); c.moveTo(PAD.l,y); c.lineTo(w-PAD.r,y); c.stroke(); c.setLineDash([]); }
+  if (view === "rx" && y0 < 0 && y1 > 0){ c.strokeStyle = css("--muted"); const y = Y(0); c.beginPath(); c.moveTo(PAD.l,y); c.lineTo(w-PAD.r,y); c.stroke(); }
+  c.strokeStyle = css("--line"); c.strokeRect(PAD.l, PAD.t, pw, ph);
+  // криви - само вътре в графиката (сравнение в друг обхват не излиза навън)
+  c.save(); c.beginPath(); c.rect(PAD.l, PAD.t, pw, ph); c.clip();
+  for (const s of series){
+    c.strokeStyle = s.color; c.lineWidth = s.dash ? 1.5 : 2; c.setLineDash(s.dash || []);
+    c.beginPath(); s.pts.forEach((q,i) => { const x = X(q[0]), y = Y(q[1]); i ? c.lineTo(x,y) : c.moveTo(x,y); }); c.stroke();
+  }
+  c.setLineDash([]);
+  // курсор
+  if (cursor >= 0 && cursor < data.length){
+    const x = X(data[cursor].f); c.strokeStyle = css("--cursor"); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x, PAD.t); c.lineTo(x, h-PAD.b); c.stroke();
+  }
+  c.restore();
+  $("legend").innerHTML = series.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join("");
+  cv._map = {X, f0, f1, pw};
+}
+function drawSmith(){
+  const cv = $("smith"); cv.style.height = cv.clientWidth + "px";
+  const {c, w, h} = prep(cv), Z0 = z0();
+  const R = Math.min(w, h)/2 - 8, cx = w/2, cy = h/2;
+  const P = g => [cx + g[0]*R, cy - g[1]*R];
+  c.save(); c.beginPath(); c.arc(cx, cy, R, 0, 2*Math.PI); c.clip();
+  c.strokeStyle = css("--grid"); c.lineWidth = 1;
+  for (const r of [0.2,0.5,1,2,5]){ const rr = R/(1+r); c.beginPath(); c.arc(cx + R*r/(1+r), cy, rr, 0, 2*Math.PI); c.stroke(); }
+  for (const x of [0.2,0.5,1,2,5]){ const rr = R/x; for (const s of [1,-1]){ c.beginPath(); c.arc(cx + R, cy - s*rr, rr, 0, 2*Math.PI); c.stroke(); } }
+  c.beginPath(); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.stroke();
+  // КСВ 2 кръг
+  c.strokeStyle = css("--warn"); c.setLineDash([3,4]); c.beginPath(); c.arc(cx, cy, R/3, 0, 2*Math.PI); c.stroke(); c.setLineDash([]);
+  const trace = (arr, col, dash) => { if (!arr || !arr.length) return; c.strokeStyle = col; c.lineWidth = dash ? 1.5 : 2; c.setLineDash(dash || []);
+    c.beginPath(); arr.forEach((p,i) => { const q = P(gamma(p.r, p.x, Z0)); i ? c.lineTo(...q) : c.moveTo(...q); }); c.stroke(); c.setLineDash([]); };
+  trace(ref, css("--ref"), [5,4]); trace(data, css("--swr"));
+  if (data.length){ const s = P(gamma(data[0].r, data[0].x, Z0)), e = P(gamma(data[data.length-1].r, data[data.length-1].x, Z0));
+    c.fillStyle = css("--x"); c.beginPath(); c.arc(...s, 3.5, 0, 2*Math.PI); c.fill();
+    c.fillStyle = css("--r"); c.beginPath(); c.arc(...e, 3.5, 0, 2*Math.PI); c.fill(); }
+  if (cursor >= 0 && cursor < data.length){ const q = P(gamma(data[cursor].r, data[cursor].x, Z0));
+    c.strokeStyle = css("--cursor"); c.lineWidth = 2; c.beginPath(); c.arc(...q, 6, 0, 2*Math.PI); c.stroke(); }
+  c.restore();
+  c.strokeStyle = css("--line"); c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, R, 0, 2*Math.PI); c.stroke();
+  c.fillStyle = css("--muted"); c.font = "11px sans-serif"; c.textAlign = "left";
+  c.fillText("● начало", 10, h - 24); c.fillText("● край", 10, h - 10);
+  c.fillStyle = css("--x"); c.fillText("●", 10, h - 24); c.fillStyle = css("--r"); c.fillText("●", 10, h - 10);
+}
+function redraw(){ drawMain(); drawSmith(); showReadout(); }
+
+// ---------- показване ----------
+function showReadout(){
+  const el = $("readout");
+  if (cursor < 0 || cursor >= data.length){ el.textContent = data.length ? "Посочи графиката с мишката, за да видиш стойностите." : ""; return; }
+  const p = data[cursor], d = derive(p, z0());
+  el.innerHTML = `<b>${fmtF(p.f)}</b> · КСВ <b>${fmtSwr(d.swr)}</b> · R <b>${p.r.toFixed(2)}</b> Ω · X <b>${p.x.toFixed(2)}</b> Ω · |Z| <b>${d.zabs.toFixed(1)}</b> Ω · RL <b>${d.rl.toFixed(1)}</b> dB · ${lc(p)}`;
+}
+// Лента около най-ниския КСВ. Границите се интерполират линейно между двете точки,
+// между които КСВ пресича прага (иначе лентата излиза до една стъпка по-тясна).
+function bandwidth(swr, i0, lim){
+  if (swr[i0] > lim) return null;
+  let a = i0, b = i0; while (a > 0 && swr[a-1] <= lim) a--; while (b < swr.length-1 && swr[b+1] <= lim) b++;
+  const cross = (i, j) => { const s1 = swr[i], s2 = swr[j];   // i вътре (<= lim), j отвън
+    const t = (s2 !== s1) ? (lim - s1)/(s2 - s1) : 0; return data[i].f + Math.min(Math.max(t,0),1)*(data[j].f - data[i].f); };
+  const fa = a > 0 ? cross(a, a-1) : data[a].f, fb = b < swr.length-1 ? cross(b, b+1) : data[b].f;
+  return {fa, fb, open: a === 0 || b === swr.length-1};
+}
+function showStats(){
+  const el = $("stats");
+  if (!data.length){ el.innerHTML = ""; return; }
+  const Z0 = z0(), swr = data.map(p => derive(p, Z0).swr);
+  let i0 = 0; swr.forEach((v,i) => { if (v < swr[i0]) i0 = i; });
+  const p = data[i0];
+  const card = (k, v, s) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s||""}</div></div>`;
+  const bw = lim => { const r = bandwidth(swr, i0, lim); if (!r) return card(`Лента при КСВ ≤ ${lim}`, "—", "няма такава");
+    const kHz = (r.fb - r.fa)/1e3;
+    return card(`Лента при КСВ ≤ ${lim}`, (r.open?"≥ ":"") + (kHz >= 1000 ? (kHz/1e3).toFixed(3)+" MHz" : kHz.toFixed(0)+" kHz"),
+      `${(r.fa/1e6).toFixed(3)} – ${(r.fb/1e6).toFixed(3)} MHz${r.open?" (до края на обхвата)":""}`); };
+  el.innerHTML = card("Най-нисък КСВ", fmtSwr(swr[i0]), fmtF(p.f)) +
+    card("Импеданс там", `${p.r.toFixed(1)} ${p.x < 0 ? "−" : "+"} j${Math.abs(p.x).toFixed(1)}`, "Ω, " + lc(p)) +
+    bw(1.5) + bw(2) +
+    card("Точки", data.length, `${fmtF(data[0].f)} – ${fmtF(data[data.length-1].f)}`);
+}
+function showTable(){
+  const Z0 = z0();
+  $("tbl").innerHTML = "<tr><th>MHz</th><th>КСВ</th><th>R, Ω</th><th>X, Ω</th><th>|Z|, Ω</th><th>RL, dB</th></tr>" +
+    data.map(p => { const d = derive(p, Z0);
+      return `<tr><td>${(p.f/1e6).toFixed(6)}</td><td>${fmtSwr(d.swr, 3)}</td><td>${p.r.toFixed(2)}</td><td>${p.x.toFixed(2)}</td><td>${d.zabs.toFixed(2)}</td><td>${d.rl.toFixed(2)}</td></tr>`; }).join("");
+}
+function setMsg(t, err){ const m = $("msg"); m.textContent = t || ""; m.className = "msg" + (err ? " err" : ""); }
+function refreshAll(){ redraw(); showStats(); showTable(); }
+
+// ---------- връзка със сървъра ----------
+async function api(path, body){
+  const r = await fetch(path, body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  return r.json();
+}
+async function checkVer(){
+  const el = $("conn"); el.className = "pill"; el.textContent = "връзка: проверява се…";
+  try {
+    const r = await api("/api/ver", {});
+    if (r.ok){
+      const fm = r.fmax ? Math.round(r.fmax/1e6) : null;
+      el.className = "pill ok"; el.textContent = `${r.ver} · ${r.port.replace("/dev/","")}` + (fm ? ` · до ${fm} MHz` : "");
+      if (fm){ $("fStart").max = fm; $("fStop").max = fm; }
+      setMsg("");
+    }
+    else if (r.busy){ el.className = "pill"; el.textContent = "уредът е зает (мери)"; }
+    else { el.className = "pill bad"; el.textContent = "няма връзка"; setMsg(r.error, true); }
+  } catch(e){ el.className = "pill bad"; el.textContent = "програмата не работи"; setMsg("AA Scope не отговаря. Пусни отново „AA Scope.command“.", true); }
+}
+function readInputs(){
+  const a = Math.round(parseFloat($("fStart").value)*1e6), b = Math.round(parseFloat($("fStop").value)*1e6), n = parseInt($("nPts").value, 10);
+  return {start:a, stop:b, points:n};
+}
+async function run(){
+  if (running) return;
+  const q = readInputs();
+  if (!(q.stop > q.start)){ setMsg("Краят трябва да е над началото.", true); return; }
+  running = true; $("btnRun").disabled = true; setMsg("Мери се…");
+  const r = await api("/api/sweep", q).catch(() => ({ok:false, error:"AA Scope не отговаря."}));
+  if (!r.ok){ running = false; $("btnRun").disabled = false; setMsg(r.error, true); $("cont").checked = false; return; }
+  data = []; cursor = -1;
+  poll();
+}
+async function poll(){
+  clearTimeout(pollTimer);
+  let s; try { s = await api("/api/status"); } catch(e){ pollTimer = setTimeout(poll, 500); return; }
+  data = s.points.map(q => ({f:q[0], r:q[1], x:q[2]}));
+  $("bar").style.width = (s.total ? Math.min(100, 100*data.length/s.total) : 0) + "%";
+  redraw();
+  if (s.running){ pollTimer = setTimeout(poll, 250); return; }
+  running = false; $("btnRun").disabled = false; refreshAll();
+  if (s.error){ setMsg(s.error, true); $("cont").checked = false; return; }
+  const secs = (s.finished - s.started).toFixed(1);
+  setMsg(`Готово: ${data.length} точки за ${secs} s.`);
+  if ($("cont").checked) setTimeout(run, 150);
+}
+
+// ---------- запис ----------
+function stamp(){ const d = new Date(), z = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}`; }
+function download(name, text){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], {type:"text/plain"}));
+  a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function baseName(){ return `aa_${stamp()}_${(data[0].f/1e6).toFixed(3)}-${(data[data.length-1].f/1e6).toFixed(3)}MHz`; }
+function saveS1p(){
+  if (!data.length){ setMsg("Няма измерване за запис.", true); return; }
+  const Z0 = z0();
+  let t = `! AA Scope LZ1RVD - EU1KY analyzer (r11), ${new Date().toISOString()}\n# MHz S MA R ${Z0}\n`;
+  for (const p of data){ const g = gamma(p.r, p.x, Z0);
+    t += `${(p.f/1e6).toFixed(6)} ${Math.hypot(g[0],g[1]).toFixed(6)} ${(Math.atan2(g[1],g[0])*180/Math.PI).toFixed(3)}\n`; }
+  download(baseName() + ".s1p", t); setMsg("Записано в Downloads: " + baseName() + ".s1p");
+}
+function saveCsv(){
+  if (!data.length){ setMsg("Няма измерване за запис.", true); return; }
+  const Z0 = z0();
+  let t = "MHz,SWR,R_ohm,X_ohm,Zabs_ohm,RL_dB\n";
+  for (const p of data){ const d = derive(p, Z0);
+    t += `${(p.f/1e6).toFixed(6)},${d.swr.toFixed(4)},${p.r.toFixed(3)},${p.x.toFixed(3)},${d.zabs.toFixed(3)},${d.rl.toFixed(3)}\n`; }
+  download(baseName() + ".csv", t); setMsg("Записано в Downloads: " + baseName() + ".csv");
+}
+
+// ---------- събития ----------
+$("bands").innerHTML = BANDS.map((b,i) => `<button data-i="${i}">${b[0]}</button>`).join("");
+$("bands").addEventListener("click", e => { const i = e.target.dataset.i; if (i === undefined) return;
+  const b = BANDS[i]; $("fStart").value = b[1].toFixed(3); $("fStop").value = b[2].toFixed(3); });
+$("tabs").addEventListener("click", e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  view = v; [...$("tabs").querySelectorAll("button")].forEach(b => b.classList.toggle("on", b.dataset.v === v)); redraw(); });
+$("swrMax").addEventListener("change", redraw);
+$("z0").addEventListener("change", refreshAll);
+$("btnRun").addEventListener("click", run);
+$("btnVer").addEventListener("click", checkVer);
+$("btnQuit").addEventListener("click", async () => {
+  const r = await api("/api/quit", {}).catch(() => ({ok:true}));
+  if (!r.ok){ setMsg(r.error, true); return; }
+  $("cont").checked = false;
+  const el = $("conn"); el.className = "pill"; el.textContent = "програмата е спряна";
+  setMsg("AA Scope е спрян. Този раздел може да се затвори. Пускане отново: AA Scope.app");
+  document.querySelectorAll("button").forEach(b => b.disabled = true);
+});
+$("btnRef").addEventListener("click", () => { if (data.length){ ref = data.map(p => ({...p})); redraw(); setMsg("Измерването е запомнено за сравнение (пунктир)."); } });
+$("btnRefClr").addEventListener("click", () => { ref = null; redraw(); });
+$("btnS1p").addEventListener("click", saveS1p);
+$("btnCsv").addEventListener("click", saveCsv);
+$("main").addEventListener("mousemove", e => {
+  const m = $("main")._map; if (!m || !data.length) return;
+  const rect = $("main").getBoundingClientRect(), x = e.clientX - rect.left;
+  const f = m.f0 + (x - PAD.l)/m.pw * (m.f1 - m.f0);
+  let best = 0; data.forEach((p,i) => { if (Math.abs(p.f - f) < Math.abs(data[best].f - f)) best = i; });
+  cursor = best; drawMain(); drawSmith(); showReadout();
+});
+$("main").addEventListener("mouseleave", () => { cursor = -1; drawMain(); drawSmith(); showReadout(); });
+window.addEventListener("resize", redraw);
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT") run(); });
+
+redraw(); checkVer();
+api("/api/status").then(s => { if (s.points && s.points.length){ data = s.points.map(q => ({f:q[0], r:q[1], x:q[2]})); refreshAll(); } if (s.running){ running = true; $("btnRun").disabled = true; poll(); } }).catch(()=>{});
+</script>
+</body>
+</html>
